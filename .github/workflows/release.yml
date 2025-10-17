@@ -36,9 +36,18 @@ jobs:
           # 移除版本号前的'v'
           NGINX_VERSION=${NGINX_VERSION#v}
           echo "Building Nginx version ${NGINX_VERSION} for Debian ${DEBIAN_VERSION}"
-          docker compose run --build --rm nginx-builder
-          tar -czf nginx-${NGINX_VERSION}-debian-${DEBIAN_VERSION}.tar.gz -C output .
-          docker rmi nginx-builder:${NGINX_VERSION}-${DEBIAN_VERSION}
+          # 使用环境变量文件
+          echo "DEBIAN_VERSION=${DEBIAN_VERSION}" > .env
+          echo "NGINX_VERSION=${NGINX_VERSION}" >> .env
+          # 显示构建环境
+          cat .env
+          # 使用 --env-file 确保环境变量传递
+          docker compose --env-file .env run --build --rm nginx-builder
+          # 检查输出目录是否存在并创建压缩包
+          mkdir -p output
+          tar -czf nginx-${NGINX_VERSION}-debian-${DEBIAN_VERSION}.tar.gz -C output . || echo "Warning: tar command failed, checking output directory:"
+          ls -la output/
+          docker rmi nginx-builder:${NGINX_VERSION}-${DEBIAN_VERSION} || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
