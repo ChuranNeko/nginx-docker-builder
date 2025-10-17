@@ -1,0 +1,60 @@
+name: Release Nginx Build
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送带v开头的tag时触发
+
+env:
+  DEBIAN_VERSIONS: "bookworm bullseye buster"  # 支持的 Debian 版本
+  NGINX_VERSION: ${{ github.ref_name }}  # 使用 tag 名称作为 Nginx 版本号
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        debian_version: ['bookworm', 'bullseye', 'buster']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Nginx
+        env:
+          DEBIAN_VERSION: ${{ matrix.debian_version }}
+          NGINX_VERSION: ${{ github.ref_name }}
+        run: |
+          # 移除版本号前的'v'
+          NGINX_VERSION=${NGINX_VERSION#v}
+          echo "Building Nginx version ${NGINX_VERSION} for Debian ${DEBIAN_VERSION}"
+          docker-compose run --build --rm nginx-builder
+          tar -czf nginx-${NGINX_VERSION}-debian-${DEBIAN_VERSION}.tar.gz -C output .
+          docker rmi nginx-builder:${NGINX_VERSION}-${DEBIAN_VERSION}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: nginx-debian-${{ matrix.debian_version }}
+          path: nginx-*.tar.gz
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            nginx-debian-*/nginx-*.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
