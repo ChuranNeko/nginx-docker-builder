@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  nginx-builder:
+    build:
+      context: .
+      args:
+        - DEBIAN_VERSION=${DEBIAN_VERSION}
+        - NGINX_VERSION=${NGINX_VERSION}
+    image: nginx-builder:${NGINX_VERSION}-${DEBIAN_VERSION}
+    container_name: nginx-builder
+    entrypoint: /bin/bash -c 'cp -r /usr/local/nginx/* /output/'
+    volumes:
+      - ./output:/output
