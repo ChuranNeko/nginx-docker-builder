@@ -23,6 +23,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Setup Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+
       - name: Build Nginx
         env:
           DEBIAN_VERSION: ${{ matrix.debian_version }}
@@ -31,7 +36,7 @@ jobs:
           # 移除版本号前的'v'
           NGINX_VERSION=${NGINX_VERSION#v}
           echo "Building Nginx version ${NGINX_VERSION} for Debian ${DEBIAN_VERSION}"
-          docker-compose run --build --rm nginx-builder
+          docker compose run --build --rm nginx-builder
           tar -czf nginx-${NGINX_VERSION}-debian-${DEBIAN_VERSION}.tar.gz -C output .
           docker rmi nginx-builder:${NGINX_VERSION}-${DEBIAN_VERSION}
 
