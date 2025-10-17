@@ -33,20 +33,66 @@ jobs:
           DEBIAN_VERSION: ${{ matrix.debian_version }}
           NGINX_VERSION: ${{ github.ref_name }}
         run: |
-          # 移除版本号前的'v'
-          NGINX_VERSION=${NGINX_VERSION#v}
+          # 显示工作目录内容
+          echo "Current directory contents:"
+          ls -la
+          
+          # 显示 docker-compose.yml 内容
+          echo "docker-compose.yml contents:"
+          cat docker-compose.yml
+          
+          # 处理版本号
+          NGINX_VERSION=${NGINX_VERSION#v}  # 移除版本号前的'v'
+          # 验证下载 URL
+          NGINX_URL="https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
+          echo "Checking Nginx download URL: ${NGINX_URL}"
+          if curl -I "${NGINX_URL}" 2>&1 | grep -q "200 OK"; then
+            echo "Nginx version ${NGINX_VERSION} is available at ${NGINX_URL}"
+          else
+            echo "Error: Nginx version ${NGINX_VERSION} not found at ${NGINX_URL}"
+            exit 1
+          fi
+          
           echo "Building Nginx version ${NGINX_VERSION} for Debian ${DEBIAN_VERSION}"
+          
           # 使用环境变量文件
           echo "DEBIAN_VERSION=${DEBIAN_VERSION}" > .env
           echo "NGINX_VERSION=${NGINX_VERSION}" >> .env
+          
           # 显示构建环境
+          echo "Environment variables:"
           cat .env
-          # 使用 --env-file 确保环境变量传递
-          docker compose --env-file .env run --build --rm nginx-builder
-          # 检查输出目录是否存在并创建压缩包
+          
+          # 显示 Docker 信息
+          echo "Docker version:"
+          docker --version
+          echo "Docker Compose version:"
+          docker compose version
+          
+          # 构建镜像
+          echo "Building Docker image..."
+          docker compose --env-file .env build nginx-builder
+          
+          # 运行构建
+          echo "Running builder..."
+          docker compose --env-file .env run --rm nginx-builder
+          
+          # 检查输出目录
+          echo "Checking output directory..."
           mkdir -p output
-          tar -czf nginx-${NGINX_VERSION}-debian-${DEBIAN_VERSION}.tar.gz -C output . || echo "Warning: tar command failed, checking output directory:"
           ls -la output/
+          
+          # 创建压缩包
+          echo "Creating tarball..."
+          tar -czf nginx-${NGINX_VERSION}-debian-${DEBIAN_VERSION}.tar.gz -C output . || {
+            echo "Error: tar command failed"
+            echo "Output directory contents:"
+            ls -la output/
+            exit 1
+          }
+          
+          # 清理镜像
+          echo "Cleaning up..."
           docker rmi nginx-builder:${NGINX_VERSION}-${DEBIAN_VERSION} || true
 
       - name: Upload artifact
